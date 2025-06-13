@@ -14,9 +14,22 @@ st.title("📊 소비자물가 상승률과 소비 패턴 변화 분석")
 # -------------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("지출목적별_소비자물가지수_품목포함__2020100__20250611104117_분석(전년_대비_증감률).csv", encoding='cp949')
-    df.columns = df.columns.str.strip()
-    df['시점'] = pd.to_datetime(df['시점'], format='%Y%m')
+    df = pd.read_csv(
+        "지출목적별_소비자물가지수_품목포함__2020100__20250611104117_분석(전년_대비_증감률).csv",
+        encoding='cp949'
+    )
+    df.columns = df.columns.str.strip()  # 컬럼명 공백 제거
+    st.write("📌 CSV 컬럼명:", df.columns.tolist())  # 컬럼 확인용
+
+    # '시점'이 없으면 '기간'으로 대체
+    if '시점' not in df.columns:
+        if '기간' in df.columns:
+            df = df.rename(columns={'기간': '시점'})
+        else:
+            st.error("❌ '시점' 또는 '기간' 컬럼이 데이터에 없습니다.")
+            st.stop()
+
+    df['시점'] = pd.to_datetime(df['시점'], format='%Y%m', errors='coerce')
     return df
 
 df = load_data()
