@@ -78,7 +78,7 @@ filtered_df = df[
 # -------------------------------
 # 1. 시도별 꺾은선 그래프
 # -------------------------------
-st.subheader("1️⃣ 시도별 소비자물가 상승률 추이")
+st.subheader("시도별 소비자물가 상승률 추이")
 
 plt.figure(figsize=(12, 5))
 sns.lineplot(data=filtered_df, x="시점", y="전년_대비_증감률", hue="시도별", errorbar=None)
@@ -93,7 +93,7 @@ plt.clf()
 # -------------------------------
 # 2. 최근 시점 기준 TOP/BOTTOM 10
 # -------------------------------
-st.subheader("2️⃣ 최근 시점 기준 시도별 상승률 TOP/BOTTOM 10")
+st.subheader("최근 시점 기준 전년 대비 증감률")
 
 latest_date = filtered_df["시점"].max()
 latest_df = filtered_df[filtered_df["시점"] == latest_date]
@@ -103,8 +103,8 @@ bottom10 = latest_df.sort_values("전년_대비_증감률").head(10)
 
 col1, col2 = st.columns(2)
 with col1:
-    st.markdown("#### 🔺 상승률 TOP 10")
-    st.dataframe(top10[["시도별", "전년_대비_증감률"]])
+    st.markdown("#### 🔺 상승률")
+    #st.dataframe(top10[["시도별", "전년_대비_증감률"]])
 with col2:
-    st.markdown("#### 🔻 하락률 TOP 10")
-    st.dataframe(bottom10[["시도별", "전년_대비_증감률"]])
+    st.markdown("#### 🔻 하락률")
+    #st.dataframe(bottom10[["시도별", "전년_대비_증감률"]])
