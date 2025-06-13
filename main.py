@@ -5,8 +5,11 @@ import seaborn as sns
 import matplotlib.font_manager as fm
 import os
 
+# ✅ 반드시 첫 줄에 페이지 설정
+st.set_page_config(page_title="소비자물가 및 소비 패턴 변화 분석", layout="wide")
+
 # -------------------------------
-# 한글 폰트 설정 (NanumGothic)
+# 한글 폰트 설정
 # -------------------------------
 def set_korean_font():
     font_path = "NanumGothic.ttf"
@@ -14,16 +17,16 @@ def set_korean_font():
         fm.fontManager.addfont(font_path)
         plt.rcParams['font.family'] = 'NanumGothic'
         plt.rcParams['axes.unicode_minus'] = False
-    else:
-        st.warning("⚠️ NanumGothic.ttf 폰트 파일이 없으면 한글이 깨질 수 있습니다.")
-
-set_korean_font()
+        return True
+    return False
 
 # -------------------------------
-# 페이지 설정
+# 앱 타이틀 및 폰트 경고 출력
 # -------------------------------
-st.set_page_config(page_title="소비자물가 및 소비 패턴 변화 분석", layout="wide")
 st.title("📊 소비자물가 상승률과 소비 패턴 변화 분석")
+
+if not set_korean_font():
+    st.warning("⚠️ NanumGothic.ttf 폰트 파일이 없으면 그래프에 한글이 깨질 수 있습니다.")
 
 # -------------------------------
 # 데이터 불러오기 및 전처리
