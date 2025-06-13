@@ -10,7 +10,7 @@ st.set_page_config(page_title="소비자물가 및 소비 패턴 변화 분석",
 st.title("📊 소비자물가 상승률과 소비 패턴 변화 분석")
 
 # -------------------------------
-# 데이터 불러오기 함수
+# 데이터 불러오기 및 변환
 # -------------------------------
 @st.cache_data
 def load_data():
@@ -18,19 +18,22 @@ def load_data():
         "지출목적별_소비자물가지수_품목포함__2020100__20250611104117_분석(전년_대비_증감률).csv",
         encoding='cp949'
     )
-    df.columns = df.columns.str.strip()  # 컬럼명 공백 제거
-    st.write("📌 CSV 컬럼명:", df.columns.tolist())  # 컬럼 확인용
+    df.columns = df.columns.str.strip()
+    
+    # 확인용 컬럼 출력
+    st.write("📌 원본 CSV 컬럼:", df.columns.tolist())
 
-    # '시점'이 없으면 '기간'으로 대체
-    if '시점' not in df.columns:
-        if '기간' in df.columns:
-            df = df.rename(columns={'기간': '시점'})
-        else:
-            st.error("❌ '시점' 또는 '기간' 컬럼이 데이터에 없습니다.")
-            st.stop()
+    # wide → long format 변환
+    id_vars = ['시도별', '지출목적별']
+    value_vars = [col for col in df.columns if col not in id_vars]
+    df_long = pd.melt(df, id_vars=id_vars, value_vars=value_vars, var_name='시점', value_name='전년_대비_증감률')
 
-    df['시점'] = pd.to_datetime(df['시점'], format='%Y%m', errors='coerce')
-    return df
+    # 시점 컬럼을 날짜로 변환
+    df_long['시점'] = pd.to_datetime(df_long['시점'].str.replace('.1', '-07').str.replace('.0', '-01'), format='%Y-%m', errors='coerce')
+
+    # 수치로 변환
+    df_long['전년_대비_증감률'] = pd.to_numeric(df_long['전년_대비_증감률'], errors='coerce')
+    return df_long
 
 df = load_data()
 
@@ -40,32 +43,31 @@ df = load_data()
 st.sidebar.header("🔎 필터 설정")
 start_date = st.sidebar.date_input("시작 시점", df["시점"].min().date())
 end_date = st.sidebar.date_input("종료 시점", df["시점"].max().date())
-category = st.sidebar.selectbox("지출 목적 선택", ["전체지수"] + sorted(df["지출목적별"].unique()))
+category = st.sidebar.selectbox("지출 목적 선택", sorted(df["지출목적별"].unique()))
 
 # 필터 적용
 filtered_df = df[(df["시점"] >= pd.to_datetime(start_date)) & (df["시점"] <= pd.to_datetime(end_date))]
-if category != "전체지수":
-    filtered_df = filtered_df[filtered_df["지출목적별"] == category]
+filtered_df = filtered_df[filtered_df["지출목적별"] == category]
 
 # -------------------------------
-# 1. 소비자물가 상승률 추이 시각화
+# 1. 시도별 소비자물가 상승률 추이
 # -------------------------------
-st.subheader("1️⃣ 소비자물가 상승률 추이")
+st.subheader("1️⃣ 시도별 소비자물가 상승률 추이")
 
-plt.figure(figsize=(12, 4))
-sns.lineplot(data=filtered_df, x="시점", y="전년_대비_증감률", hue="지출목적별", errorbar=None)
-plt.title("전년 대비 소비자물가 상승률 추이")
+plt.figure(figsize=(12, 5))
+sns.lineplot(data=filtered_df, x="시점", y="전년_대비_증감률", hue="시도별", errorbar=None)
+plt.title(f"{category} - 시도별 소비자물가 상승률")
 plt.xlabel("시점")
-plt.ylabel("상승률 (%)")
+plt.ylabel("전년 대비 상승률 (%)")
 plt.xticks(rotation=45)
 plt.grid(True)
 st.pyplot(plt.gcf())
 plt.clf()
 
 # -------------------------------
-# 2. 최근 시점 기준 품목별 상승/하락률 TOP 10
+# 2. 최근 시점 기준 상승/하락률 TOP 10
 # -------------------------------
-st.subheader("2️⃣ 최근 시점 품목별 소비자물가 상승률 TOP/BOTTOM 10")
+st.subheader("2️⃣ 최근 시점 기준 시도별 상승률 TOP/BOTTOM 10")
 
 latest_date = filtered_df["시점"].max()
 latest_df = filtered_df[filtered_df["시점"] == latest_date]
@@ -76,27 +78,7 @@ bottom10 = latest_df.sort_values("전년_대비_증감률").head(10)
 col1, col2 = st.columns(2)
 with col1:
     st.markdown("#### 🔺 상승률 TOP 10")
-    st.dataframe(top10[["지출목적별", "품목", "전년_대비_증감률"]])
+    st.dataframe(top10[["시도별", "전년_대비_증감률"]])
 with col2:
     st.markdown("#### 🔻 하락률 TOP 10")
-    st.dataframe(bottom10[["지출목적별", "품목", "전년_대비_증감률"]])
-
-# -------------------------------
-# 3. 품목별 상세 변화 추이
-# -------------------------------
-st.subheader("3️⃣ 품목별 상세 소비자물가 변화 추이")
-
-selected_items = st.multiselect("분석할 품목을 선택하세요", sorted(df["품목"].dropna().unique()), default=["쌀", "휘발유"])
-
-if selected_items:
-    item_df = df[df["품목"].isin(selected_items)]
-
-    plt.figure(figsize=(14, 5))
-    sns.lineplot(data=item_df, x="시점", y="전년_대비_증감률", hue="품목", errorbar=None)
-    plt.title("품목별 소비자물가 상승률 변화")
-    plt.xlabel("시점")
-    plt.ylabel("전년 대비 상승률 (%)")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-    st.pyplot(plt.gcf())
-    plt.clf()
+    st.dataframe(bottom10[["시도별", "전년_대비_증감률"]])
