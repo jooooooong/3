@@ -1,12 +1,14 @@
 import streamlit as st
+
+# ✅ set_page_config는 반드시 가장 위에서 실행
+st.set_page_config(page_title="소비자물가 및 소비 패턴 변화 분석", layout="wide")
+
+# 나머지 라이브러리 임포트
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.font_manager as fm
 import os
-
-# ✅ 반드시 첫 줄에 페이지 설정
-st.set_page_config(page_title="소비자물가 및 소비 패턴 변화 분석", layout="wide")
 
 # -------------------------------
 # 한글 폰트 설정
@@ -21,7 +23,7 @@ def set_korean_font():
     return False
 
 # -------------------------------
-# 앱 타이틀 및 폰트 경고 출력
+# 앱 제목 및 폰트 경고
 # -------------------------------
 st.title("📊 소비자물가 상승률과 소비 패턴 변화 분석")
 
@@ -39,13 +41,17 @@ def load_data():
     )
     df.columns = df.columns.str.strip()
 
-    # wide → long format 변환
+    # wide → long 변환
     id_vars = ['시도별', '지출목적별']
     value_vars = [col for col in df.columns if col not in id_vars]
-    df_long = pd.melt(df, id_vars=id_vars, value_vars=value_vars, var_name='시점', value_name='전년_대비_증감률')
+    df_long = pd.melt(df, id_vars=id_vars, value_vars=value_vars,
+                      var_name='시점', value_name='전년_대비_증감률')
 
-    # 시점 형식 변환
-    df_long['시점'] = pd.to_datetime(df_long['시점'].str.replace('.1', '-07').str.replace('.0', '-01'), format='%Y-%m', errors='coerce')
+    # 시점 열 문자열 → 날짜
+    df_long['시점'] = pd.to_datetime(
+        df_long['시점'].str.replace('.1', '-07').str.replace('.0', '-01'),
+        format='%Y-%m', errors='coerce'
+    )
 
     # 수치형 변환
     df_long['전년_대비_증감률'] = pd.to_numeric(df_long['전년_대비_증감률'], errors='coerce')
@@ -55,7 +61,7 @@ def load_data():
 df = load_data()
 
 # -------------------------------
-# 필터 설정
+# 사이드바 필터
 # -------------------------------
 st.sidebar.header("🔎 필터 설정")
 start_date = st.sidebar.date_input("시작 시점", df["시점"].min().date())
@@ -63,8 +69,11 @@ end_date = st.sidebar.date_input("종료 시점", df["시점"].max().date())
 category = st.sidebar.selectbox("지출 목적 선택", sorted(df["지출목적별"].unique()))
 
 # 필터 적용
-filtered_df = df[(df["시점"] >= pd.to_datetime(start_date)) & (df["시점"] <= pd.to_datetime(end_date))]
-filtered_df = filtered_df[filtered_df["지출목적별"] == category]
+filtered_df = df[
+    (df["시점"] >= pd.to_datetime(start_date)) &
+    (df["시점"] <= pd.to_datetime(end_date)) &
+    (df["지출목적별"] == category)
+]
 
 # -------------------------------
 # 1. 시도별 꺾은선 그래프
