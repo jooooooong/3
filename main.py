@@ -76,13 +76,13 @@ filtered_df = df[
 ]
 
 # -------------------------------
-# 1. 시도별 꺾은선 그래프
+# 1. 꺾은선 그래프
 # -------------------------------
-st.subheader("시도별 소비자물가 상승률 추이")
+st.subheader("📈 전년 대비 소비자물가 상승률 추이")
 
 plt.figure(figsize=(12, 5))
-sns.lineplot(data=filtered_df, x="시점", y="전년_대비_증감률", hue="시도별", errorbar=None)
-plt.title(f"{category} - 시도별 소비자물가 상승률")
+sns.lineplot(data=filtered_df, x="시점", y="전년_대비_증감률", errorbar=None)
+plt.title(f"{category} - 소비자물가 상승률 추이")
 plt.xlabel("시점")
 plt.ylabel("전년 대비 상승률 (%)")
 plt.xticks(rotation=45)
@@ -91,20 +91,28 @@ st.pyplot(plt.gcf())
 plt.clf()
 
 # -------------------------------
-# 2. 최근 시점 기준 TOP/BOTTOM 10
+# 2. 최대/최소 상승률 시점 요약
 # -------------------------------
-st.subheader("최근 시점 기준 전년 대비 증감률")
+st.subheader("📌 선택 기간 내 최고 / 최저 전년 대비 상승률")
 
-latest_date = filtered_df["시점"].max()
-latest_df = filtered_df[filtered_df["시점"] == latest_date]
+if not filtered_df.empty:
+    max_row = filtered_df.loc[filtered_df["전년_대비_증감률"].idxmax()]
+    min_row = filtered_df.loc[filtered_df["전년_대비_증감률"].idxmin()]
 
-top10 = latest_df.sort_values("전년_대비_증감률", ascending=False).head(10)
-bottom10 = latest_df.sort_values("전년_대비_증감률").head(10)
+    col1, col2 = st.columns(2)
 
-col1, col2 = st.columns(2)
-with col1:
-    st.markdown("#### 🔺 상승률")
-    #st.dataframe(top10[["시도별", "전년_대비_증감률"]])
-with col2:
-    st.markdown("#### 🔻 하락률")
-    #st.dataframe(bottom10[["시도별", "전년_대비_증감률"]])
+    with col1:
+        st.markdown("#### 🔺 가장 많이 오른 시점")
+        st.metric(
+            label=f"{max_row['시점'].strftime('%Y년 %m월')}",
+            value=f"{max_row['전년_대비_증감률']:.2f}%",
+        )
+
+    with col2:
+        st.markdown("#### 🔻 가장 많이 내린 시점")
+        st.metric(
+            label=f"{min_row['시점'].strftime('%Y년 %m월')}",
+            value=f"{min_row['전년_대비_증감률']:.2f}%",
+        )
+else:
+    st.info("선택된 조건에 해당하는 데이터가 없습니다.")
