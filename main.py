@@ -98,7 +98,7 @@ base = alt.Chart(df_plot).encode(
 )
 
 line_cpi = base.mark_line(color="green", strokeWidth=3).encode(
-    y=alt.Y("소비자물가지수:Q", title="소비자물가지수", axis=alt.Axis(titleColor="green")),
+    y=alt.Y("소비자물가지수:Q", axis=alt.Axis(title=None)),
     tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="소비자물가지수")]
 )
 
@@ -108,7 +108,7 @@ point_cpi = base.mark_point(color="green", size=40, filled=True).encode(
 )
 
 line_rate = base.mark_line(color="blue", strokeWidth=2).encode(
-    y=alt.Y("전년_대비_증감률:Q", title="전년 대비 증감률 (%)", axis=alt.Axis(titleColor="blue")),
+    y=alt.Y("전년_대비_증감률:Q", axis=alt.Axis(title=None)),
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
