@@ -108,7 +108,7 @@ point_cpi = base.mark_point(color="green", size=40, filled=True).encode(
 )
 
 line_rate = base.mark_line(color="blue", strokeWidth=2).encode(
-    y=alt.Y("전년_대비_증감률:Q", axis=alt.Axis(title=None)),
+    y=alt.Y("전년_대비_증감률:Q", axis=alt.Axis(title=None, offset=50)),
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
