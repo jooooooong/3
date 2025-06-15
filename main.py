@@ -1,9 +1,9 @@
 import streamlit as st
 
-# 가장 먼저 실행
+# ✅ 가장 먼저 페이지 설정
 st.set_page_config(page_title="소비자물가 및 소비 패턴 변화 분석", layout="wide")
 
-# 기타 라이브러리
+# 외부 라이브러리
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
@@ -23,6 +23,7 @@ def set_korean_font():
     return False
 
 st.title("📊 소비자물가 상승률과 소비 패턴 변화 분석")
+
 if not set_korean_font():
     st.warning("⚠️ NanumGothic.ttf 폰트 파일이 없으면 그래프에 한글이 깨질 수 있습니다.")
 
@@ -33,23 +34,36 @@ if not set_korean_font():
 def load_data():
     df = pd.read_csv("지출목적별_소비자물가지수_품목포함__2020100__20250611104117_분석(전년_대비_증감률).csv", encoding='cp949')
     df.columns = df.columns.str.strip()
-    df = df[df["지출목적별"] != "지출목적별"]  # 잘못된 항목 제거
+    df = df[df["지출목적별"] != "지출목적별"]  # 필터 오류 유발 항목 제거
 
     id_vars = ['시도별', '지출목적별']
     value_vars = [col for col in df.columns if col not in id_vars]
-    df_long = pd.melt(df, id_vars=id_vars, value_vars=value_vars, var_name='시점', value_name='전년_대비_증감률')
+    df_long = pd.melt(df, id_vars=id_vars, value_vars=value_vars,
+                      var_name='시점', value_name='전년_대비_증감률')
 
     df_long['시점'] = df_long['시점'].str.replace('.1', '-07').str.replace('.0', '-01')
     df_long['시점'] = pd.to_datetime(df_long['시점'], format='%Y-%m', errors='coerce')
     df_long['연도'] = df_long['시점'].dt.year
     df_long['전년_대비_증감률'] = pd.to_numeric(df_long['전년_대비_증감률'], errors='coerce')
 
+    # 가상의 원데이터 생성 (예시) → 실제 지수 값이 없어 증감률 기준 복원
+    df_long['지수'] = 100  # 기준값
+    df_long = df_long.sort_values(['지출목적별', '시점'])
+    for cat in df_long['지출목적별'].unique():
+        df_cat = df_long[df_long['지출목적별'] == cat]
+        base = 100
+        지수 = []
+        for i, row in df_cat.iterrows():
+            지수.append(base)
+            base *= (1 + (row['전년_대비_증감률'] or 0)/100)
+        df_long.loc[df_cat.index, '지수'] = 지수
+
     return df_long
 
 df = load_data()
 
 # -------------------------------
-# 필터 설정 (연도 & 지출 항목)
+# 사이드바 필터 (연도 + 지출항목)
 # -------------------------------
 st.sidebar.header("🔎 필터 설정")
 years = sorted(df["연도"].dropna().unique())
@@ -65,46 +79,41 @@ filtered_df = df[
 ]
 
 # -------------------------------
-# 1. Altair 그래프 (겹쳐서 표시)
+# 소비자물가지수 + 전년대비 증감률 시각화
 # -------------------------------
-st.subheader("📈 소비자물가 지수 (원데이터) 및 전년 대비 증감률 추이")
+st.subheader("📈 소비자물가지수 및 전년 대비 증감률 추이")
 
-# 원데이터 = 실제 지수, 전년대비 증감률은 y2 축
 df_plot = filtered_df.copy()
-df_plot["연도"] = df_plot["시점"].dt.year
-df_plot["월"] = df_plot["시점"].dt.month
 df_plot["표시용시점"] = df_plot["시점"].dt.strftime("%Y-%m")
 
-# Altair 기반 시각화
-base = alt.Chart(df_plot).encode(
-    x=alt.X('시점:T', axis=alt.Axis(title='시점'))
+# 소비자물가지수 라인 + 점
+line_index = alt.Chart(df_plot).mark_line(color='green').encode(
+    x=alt.X('시점:T', title='시점'),
+    y=alt.Y('지수:Q', title='소비자물가지수')
 )
 
-line1 = base.mark_line(color='blue').encode(
-    y=alt.Y('전년_대비_증감률:Q', axis=alt.Axis(title='전년 대비 증감률 (%)')),
-    tooltip=['표시용시점', '전년_대비_증감률']
+points = alt.Chart(df_plot).mark_point(color='darkgreen', size=60).encode(
+    x='시점:T',
+    y='지수:Q',
+    tooltip=['표시용시점', alt.Tooltip('지수:Q', title='지수 값')]
 )
 
-line2 = base.mark_line(color='orange').encode(
-    y=alt.Y('전년_대비_증감률:Q', axis=alt.Axis(title='전년 대비 증감률 (%)'), scale=alt.Scale(zero=False)),
-    tooltip=['표시용시점', '전년_대비_증감률']
+# 전년 대비 증감률 라인
+line_rate = alt.Chart(df_plot).mark_line(color='blue', strokeDash=[5, 3]).encode(
+    x='시점:T',
+    y=alt.Y('전년_대비_증감률:Q', title='전년 대비 증감률 (%)'),
+    tooltip=['표시용시점', alt.Tooltip('전년_대비_증감률:Q', title='증감률')]
 )
 
-# 실제 지수 (원데이터)
-line_data = base.mark_line(color='green').encode(
-    y=alt.Y('전년_대비_증감률:Q', axis=alt.Axis(title='지수 값'), scale=alt.Scale(zero=False)),
-    tooltip=['표시용시점', '전년_대비_증감률']
-)
-
-# 이중 축 그래프 생성
-chart = alt.layer(line_data, line1).resolve_scale(
+# 레이어 겹치기
+chart = alt.layer(line_index + points, line_rate).resolve_scale(
     y='independent'
 ).properties(width=800, height=400)
 
 st.altair_chart(chart, use_container_width=True)
 
 # -------------------------------
-# 2. 최고/최저 요약
+# 최고 / 최저 분석 요약
 # -------------------------------
 st.subheader("📌 최고 / 최저 상승률 요약")
 
@@ -118,14 +127,14 @@ if not filtered_df.empty:
         st.metric(
             label=f"{max_row['연도']}년",
             value=f"{max_row['전년_대비_증감률']:.2f}%",
-            delta=f"지수값: {max_row['전년_대비_증감률']:.2f}"
+            delta=f"지수값: {max_row['지수']:.2f}"
         )
     with col2:
         st.markdown("#### 🔻 최저 하락 시점")
         st.metric(
             label=f"{min_row['연도']}년",
             value=f"{min_row['전년_대비_증감률']:.2f}%",
-            delta=f"지수값: {min_row['전년_대비_증감률']:.2f}"
+            delta=f"지수값: {min_row['지수']:.2f}"
         )
 else:
     st.info("선택된 범위에 해당하는 데이터가 없습니다.")
