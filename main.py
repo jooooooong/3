@@ -41,7 +41,6 @@ def load_data():
 
     # melt로 긴 포맷으로 변환
     year_cols = df.columns[2:]
-    half = ['원데이터', '전년_대비_증감률']
     years = list(dict.fromkeys(col.split('.')[0] for col in year_cols))
 
     records = []
@@ -98,7 +97,7 @@ base = alt.Chart(df_plot).encode(
 )
 
 line_cpi = base.mark_line(color="green", strokeWidth=3).encode(
-    y=alt.Y("소비자물가지수:Q", axis=alt.Axis(title=None)),
+    y=alt.Y("소비자물가지수:Q", axis=alt.Axis(title=None, labels=True, offset=0)),
     tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="소비자물가지수")]
 )
 
@@ -108,7 +107,7 @@ point_cpi = base.mark_point(color="green", size=40, filled=True).encode(
 )
 
 line_rate = base.mark_line(color="blue", strokeWidth=2).encode(
-    y=alt.Y("전년_대비_증감률:Q", axis=alt.Axis(title=None, offset=50)),
+    y=alt.Y("전년_대비_증감률:Q", axis=alt.Axis(title=None, labels=True, offset=60, tickCount=5)),
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
