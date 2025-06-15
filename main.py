@@ -1,148 +1,113 @@
-# 전체 main.py 코드 (최신 반영본)
-
 import streamlit as st
 
-# ✅ set_page_config는 가장 위에서 실행해야 함
+# ✅ set_page_config는 가장 위에서 실행
 st.set_page_config(page_title="소비자물가 및 소비 패턴 변화 분석", layout="wide")
 
-# -------------------------------
 # 라이브러리 불러오기
-# -------------------------------
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+import altair as alt
 import matplotlib.font_manager as fm
 import os
-import altair as alt
 
 # -------------------------------
-# 한글 폰트 설정 함수
+# 한글 폰트 설정
 # -------------------------------
 def set_korean_font():
     font_path = "NanumGothic.ttf"
     if os.path.exists(font_path):
         fm.fontManager.addfont(font_path)
-        plt.rcParams['font.family'] = 'NanumGothic'
-        plt.rcParams['axes.unicode_minus'] = False
         return True
     return False
 
-# -------------------------------
 # 앱 제목 및 폰트 경고
-# -------------------------------
 st.title("📊 소비자물가 상승률과 소비 패턴 변화 분석")
-
 if not set_korean_font():
     st.warning("⚠️ NanumGothic.ttf 폰트 파일이 없으면 그래프에 한글이 깨질 수 있습니다.")
 
 # -------------------------------
-# 데이터 불러오기 및 전처리
+# 데이터 로드 및 전처리
 # -------------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv(
-        "지출목적별_소비자물가지수_품목포함__2020100__20250611104117_분석(전년_대비_증감률).csv",
-        encoding='cp949',
-        skiprows=[1]  # 헤더가 두 줄인 경우
-    )
-    df.columns = df.columns.str.strip()
-    
-    id_vars = ['시도별', '지출목적별']
-    value_vars = [col for col in df.columns if col not in id_vars]
+    df = pd.read_csv("지출목적별_소비자물가지수_품목포함__2020100__20250611104117_분석(전년_대비_증감률).csv", encoding='cp949', skiprows=[1])
+    df.columns = df.iloc[0]
+    df = df.drop(index=0)
+    df = df.rename(columns={df.columns[0]: "시도별", df.columns[1]: "지출목적별"})
+    df = df.reset_index(drop=True)
 
-    # 연도/지표 나누기
-    years = []
-    indicators = []
-    for i, col in enumerate(value_vars):
-        if i % 2 == 0:
-            indicators.append("원데이터")
-        else:
-            indicators.append("전년_대비_증감률")
-        years.append(col)
+    id_vars = ["시도별", "지출목적별"]
+    value_vars = df.columns.difference(id_vars)
+    df_long = df.melt(id_vars=id_vars, value_vars=value_vars, var_name="시점_원본", value_name="값")
 
-    # 멀티 인덱스로 재구성
-    df.columns = id_vars + pd.MultiIndex.from_tuples(zip(years, indicators))
+    df_long["연도"] = df_long["시점_원본"].str.extract(r"(\d{4})")
+    df_long["구분"] = df_long["시점_원본"].apply(lambda x: "소비자물가지수" if "전년" not in x else "전년_대비_증감률")
+    df_pivot = df_long.pivot_table(index=["시도별", "지출목적별", "연도"], columns="구분", values="값", aggfunc="first").reset_index()
 
-    # long 형태로 변환
-    df = df.melt(id_vars=id_vars, var_name=["연도", "지표"], value_name="값")
+    df_pivot["소비자물가지수"] = pd.to_numeric(df_pivot["소비자물가지수"], errors="coerce")
+    df_pivot["전년_대비_증감률"] = pd.to_numeric(df_pivot["전년_대비_증감률"], errors="coerce")
+    return df_pivot
 
-    # 피벗으로 원데이터와 증감률 분리
-    df = df.pivot_table(index=['시도별', '지출목적별', '연도'], columns='지표', values='값').reset_index()
-
-    df["연도"] = df["연도"].astype(str)
-    df["표시용연도"] = df["연도"].str.replace(".1", "").str.replace(".0", "")
-    df["전년_대비_증감률"] = pd.to_numeric(df["전년_대비_증감률"], errors="coerce")
-    df["원데이터"] = pd.to_numeric(df["원데이터"], errors="coerce")
-
-    return df
-
-df_all = load_data()
+df = load_data()
 
 # -------------------------------
-# 필터: 연도/지출목적
+# 사이드바 필터 설정
 # -------------------------------
 st.sidebar.header("🔎 필터 설정")
-min_year = int(df_all["표시용연도"].min())
-max_year = int(df_all["표시용연도"].max())
+available_categories = sorted([c for c in df["지출목적별"].unique() if "지출목적별" not in c])
+selected_category = st.sidebar.selectbox("지출 항목 선택", available_categories)
 
-year_range = st.sidebar.slider("연도 범위 선택", min_value=min_year, max_value=max_year, value=(min_year, max_year))
-category_options = sorted(df_all["지출목적별"].unique())
-category_options = [cat for cat in category_options if cat != "지출목적별"]  # 제거
-selected_category = st.sidebar.selectbox("지출 항목 선택", category_options)
+years = sorted(df["연도"].dropna().unique())
+start_year, end_year = st.sidebar.select_slider("연도 범위", options=years, value=(years[0], years[-1]))
 
-# 필터 적용
-df = df_all[
-    (df_all["지출목적별"] == selected_category) &
-    (df_all["표시용연도"].astype(int) >= year_range[0]) &
-    (df_all["표시용연도"].astype(int) <= year_range[1])
+df_filtered = df[
+    (df["지출목적별"] == selected_category) &
+    (df["연도"] >= start_year) &
+    (df["연도"] <= end_year)
 ]
 
 # -------------------------------
-# 가장 많이 오른/내린 시점
+# 최고/최저 변화율 지점 표시
 # -------------------------------
-max_row = df.loc[df["전년_대비_증감률"].idxmax()]
-min_row = df.loc[df["전년_대비_증감률"].idxmin()]
+df_notna = df_filtered.dropna(subset=["전년_대비_증감률"])
+max_row = df_notna.loc[df_notna["전년_대비_증감률"].idxmax()]
+min_row = df_notna.loc[df_notna["전년_대비_증감률"].idxmin()]
 
+st.subheader("📌 변화율이 가장 큰 시점")
 col1, col2 = st.columns(2)
 with col1:
-    st.metric(
-        label=f"📈 가장 많이 오른 시점 ({selected_category})",
-        value=f"{max_row['표시용연도']}년",
-        delta=f"{max_row['전년_대비_증감률']:.2f}%",
-        help=f"지수: {max_row['원데이터']}"
-    )
+    st.markdown(f"#### 🔺 상승률 최고")
+    st.metric(label=f"{max_row['연도']}년", value=f"{max_row['전년_대비_증감률']}%", delta=f"{max_row['소비자물가지수']}")
 with col2:
-    st.metric(
-        label=f"📉 가장 많이 내린 시점 ({selected_category})",
-        value=f"{min_row['표시용연도']}년",
-        delta=f"{min_row['전년_대비_증감률']:.2f}%",
-        help=f"지수: {min_row['원데이터']}"
-    )
+    st.markdown(f"#### 🔻 하락률 최저")
+    st.metric(label=f"{min_row['연도']}년", value=f"{min_row['전년_대비_증감률']}%", delta=f"{min_row['소비자물가지수']}")
 
 # -------------------------------
-# 시각화: 꺾은선 그래프
+# 그래프 시각화 (Altair)
 # -------------------------------
 st.subheader("📈 소비자물가지수 & 전년 대비 증감률")
 
-line_cpi = alt.Chart(df).mark_line(color="green", strokeWidth=3).encode(
+df_plot = df_filtered.copy()
+df_plot["표시용연도"] = df_plot["연도"] + "년"
+
+line_cpi = alt.Chart(df_plot).mark_line(color="green", strokeWidth=3).encode(
     x=alt.X("연도:O", title="연도", labelAngle=0),
-    y=alt.Y("원데이터:Q", title="지수"),
-    tooltip=["표시용연도", alt.Tooltip("원데이터:Q", title="지수")]
+    y=alt.Y("소비자물가지수:Q", title="지수"),
+    tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="지수")]
 )
 
-point_cpi = alt.Chart(df).mark_point(color="green", size=40, filled=True).encode(
+point_cpi = alt.Chart(df_plot).mark_point(color="green", size=40, filled=True).encode(
     x=alt.X("연도:O", labelAngle=0),
-    y="원데이터:Q",
-    tooltip=["표시용연도", alt.Tooltip("원데이터:Q", title="지수")]
+    y="소비자물가지수:Q",
+    tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="지수")]
 )
 
-line_rate = alt.Chart(df).mark_line(color="blue", strokeDash=[0], strokeWidth=2).encode(
+line_rate = alt.Chart(df_plot).mark_line(color="blue", strokeDash=[0], strokeWidth=2).encode(
     x=alt.X("연도:O", labelAngle=0),
     y=alt.Y("전년_대비_증감률:Q", title="전년 대비 증감률 (%)"),
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
-point_rate = alt.Chart(df).mark_point(color="blue", size=40, filled=True).encode(
+point_rate = alt.Chart(df_plot).mark_point(color="blue", size=40, filled=True).encode(
     x=alt.X("연도:O", labelAngle=0),
     y="전년_대비_증감률:Q",
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
@@ -150,4 +115,3 @@ point_rate = alt.Chart(df).mark_point(color="blue", size=40, filled=True).encode
 
 chart = alt.layer(line_cpi + point_cpi, line_rate + point_rate).resolve_scale(y='independent')
 st.altair_chart(chart, use_container_width=True)
-
