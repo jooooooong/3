@@ -42,7 +42,7 @@ def load_data():
     # melt로 긴 포맷으로 변환
     year_cols = df.columns[2:]
     half = ['원데이터', '전년_대비_증감률']
-    years = list(dict.fromkeys(col.split('.')[0] for col in year_cols))  # 중복 제거 순서 유지
+    years = list(dict.fromkeys(col.split('.')[0] for col in year_cols))
 
     records = []
     for _, row in df.iterrows():
@@ -64,6 +64,8 @@ def load_data():
             })
 
     df_long = pd.DataFrame.from_records(records)
+    df_long = df_long.dropna(subset=['연도'])
+    df_long['연도'] = df_long['연도'].astype(int)
     df_long['표시용연도'] = df_long['연도'].astype(str) + "년"
     return df_long
 
@@ -92,30 +94,30 @@ df_plot = df[
 st.subheader("소비자물가지수 & 전년 대비 증감률")
 
 line_cpi = alt.Chart(df_plot).mark_line(color="green", strokeWidth=3).encode(
-    x=alt.X("연도:O", title="연도", labelAngle=0),
+    x=alt.X("연도:O", title="연도", axis=alt.Axis(labelAngle=0)),
     y=alt.Y("소비자물가지수:Q", title="지수"),
     tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="지수")]
 )
 
 point_cpi = alt.Chart(df_plot).mark_point(color="green", size=40, filled=True).encode(
-    x=alt.X("연도:O", labelAngle=0),
+    x=alt.X("연도:O", axis=alt.Axis(labelAngle=0)),
     y="소비자물가지수:Q",
     tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="지수")]
 )
 
-line_rate = alt.Chart(df_plot).mark_line(color="blue", strokeDash=[0], strokeWidth=2).encode(
-    x=alt.X("연도:O", labelAngle=0),
+line_rate = alt.Chart(df_plot).mark_line(color="blue", strokeWidth=2).encode(
+    x=alt.X("연도:O", axis=alt.Axis(labelAngle=0)),
     y=alt.Y("전년_대비_증감률:Q", title="전년 대비 증감률 (%)"),
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
 point_rate = alt.Chart(df_plot).mark_point(color="blue", size=40, filled=True).encode(
-    x=alt.X("연도:O", labelAngle=0),
+    x=alt.X("연도:O", axis=alt.Axis(labelAngle=0)),
     y="전년_대비_증감률:Q",
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
-chart = alt.layer(line_cpi + point_cpi, line_rate + point_rate).resolve_scale(y='independent')
+chart = alt.layer(line_cpi, point_cpi, line_rate, point_rate).resolve_scale(y='independent')
 st.altair_chart(chart, use_container_width=True)
 
 # -------------------------------
