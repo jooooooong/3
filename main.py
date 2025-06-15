@@ -93,31 +93,37 @@ df_plot = df[
 # -------------------------------
 st.subheader("소비자물가지수 & 전년 대비 증감률")
 
-line_cpi = alt.Chart(df_plot).mark_line(color="green", strokeWidth=3).encode(
-    x=alt.X("연도:O", title="연도", axis=alt.Axis(labelAngle=0)),
-    y=alt.Y("소비자물가지수:Q", title="지수"),
+base = alt.Chart(df_plot).encode(
+    x=alt.X("연도:O", title="연도", axis=alt.Axis(labelAngle=0))
+)
+
+line_cpi = base.mark_line(color="green", strokeWidth=3).encode(
+    y=alt.Y("소비자물가지수:Q", title="지수", axis=alt.Axis(titleColor="green")),
     tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="지수")]
 )
 
-point_cpi = alt.Chart(df_plot).mark_point(color="green", size=40, filled=True).encode(
-    x=alt.X("연도:O", axis=alt.Axis(labelAngle=0)),
+point_cpi = base.mark_point(color="green", size=40).encode(
     y="소비자물가지수:Q",
     tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="지수")]
 )
 
-line_rate = alt.Chart(df_plot).mark_line(color="blue", strokeWidth=2).encode(
-    x=alt.X("연도:O", axis=alt.Axis(labelAngle=0)),
-    y=alt.Y("전년_대비_증감률:Q", title="전년 대비 증감률 (%)"),
+line_rate = base.mark_line(color="blue", strokeWidth=2).encode(
+    y=alt.Y("전년_대비_증감률:Q", title="전년 대비 증감률 (%)", axis=alt.Axis(titleColor="blue")),
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
-point_rate = alt.Chart(df_plot).mark_point(color="blue", size=40, filled=True).encode(
-    x=alt.X("연도:O", axis=alt.Axis(labelAngle=0)),
+point_rate = base.mark_point(color="blue", size=40).encode(
     y="전년_대비_증감률:Q",
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
-chart = alt.layer(line_cpi, point_cpi, line_rate, point_rate).resolve_scale(y='independent')
+chart = alt.layer(line_cpi, point_cpi, line_rate, point_rate).resolve_scale(
+    y="independent"
+).configure_axis(
+    labelFontSize=12,
+    titleFontSize=14
+)
+
 st.altair_chart(chart, use_container_width=True)
 
 # -------------------------------
