@@ -23,7 +23,7 @@ def set_korean_font():
         return True
     return False
 
-st.title("소비자물가지수 상승률과 소비 패턴 변화 분석")
+st.title("📊 소비자물가 상승률과 소비 패턴 변화 분석")
 
 if not set_korean_font():
     st.warning("⚠️ NanumGothic.ttf 폰트 파일이 없으면 그래프에 한글이 깨질 수 있습니다.")
@@ -41,7 +41,8 @@ def load_data():
 
     # melt로 긴 포맷으로 변환
     year_cols = df.columns[2:]
-    years = list(dict.fromkeys(col.split('.')[0] for col in year_cols))
+    half = ['원데이터', '전년_대비_증감률']
+    years = list(dict.fromkeys(col.split('.')[0] for col in year_cols))  # 중복 제거 순서 유지
 
     records = []
     for _, row in df.iterrows():
@@ -63,8 +64,6 @@ def load_data():
             })
 
     df_long = pd.DataFrame.from_records(records)
-    df_long = df_long.dropna(subset=['연도'])
-    df_long['연도'] = df_long['연도'].astype(int)
     df_long['표시용연도'] = df_long['연도'].astype(str) + "년"
     return df_long
 
@@ -90,46 +89,39 @@ df_plot = df[
 # -------------------------------
 # 시각화: 꺾은선 그래프
 # -------------------------------
-st.subheader("소비자물가지수 & 전년 대비 증감률")
+st.subheader("📈 소비자물가지수 & 전년 대비 증감률")
 
-base = alt.Chart(df_plot).encode(
-    x=alt.X("연도:O", title="연도", axis=alt.Axis(labelAngle=0))
+line_cpi = alt.Chart(df_plot).mark_line(color="green", strokeWidth=3).encode(
+    x=alt.X("연도:O", title="연도"),
+    y=alt.Y("소비자물가지수:Q", title="지수"),
+    tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="지수")]
 )
 
-line_cpi = base.mark_line(color="green", strokeWidth=3).encode(
-    y=alt.Y("소비자물가지수:Q", axis=alt.Axis(title="소비자물가지수", titleColor="green", labelColor="green", tickColor="green", titleFontSize=13, labelFontSize=11, grid=False, domain=True, ticks=True)),
-    tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="소비자물가지수")]
-)
-
-point_cpi = base.mark_point(color="green", size=40, filled=True).encode(
+point_cpi = alt.Chart(df_plot).mark_point(color="green", size=70).encode(
+    x="연도:O",
     y="소비자물가지수:Q",
-    tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="소비자물가지수")]
+    tooltip=["표시용연도", alt.Tooltip("소비자물가지수:Q", title="지수")]
 )
 
-line_rate = base.mark_line(color="blue", strokeWidth=2).encode(
-    y=alt.Y("전년_대비_증감률:Q", axis=alt.Axis(title="전년 대비 증감률 (%)", titleColor="blue", labelColor="blue", tickColor="blue", offset=80, tickCount=5, titleFontSize=13, labelFontSize=11, grid=False, domain=False, ticks=False)),
+line_rate = alt.Chart(df_plot).mark_line(color="blue", strokeDash=[0], strokeWidth=2).encode(
+    x="연도:O",
+    y=alt.Y("전년_대비_증감률:Q", title="전년 대비 증감률 (%)"),
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
-point_rate = base.mark_point(color="blue", size=40, filled=True).encode(
+point_rate = alt.Chart(df_plot).mark_point(color="blue", size=70).encode(
+    x="연도:O",
     y="전년_대비_증감률:Q",
     tooltip=["표시용연도", alt.Tooltip("전년_대비_증감률:Q", title="전년 대비")]
 )
 
-chart = alt.layer(line_cpi, point_cpi, line_rate, point_rate).resolve_scale(
-    y="independent"
-).configure_axis(
-    labelFontSize=12,
-    titleFontSize=14,
-    grid=False
-)
-
+chart = alt.layer(line_cpi + point_cpi, line_rate + point_rate).resolve_scale(y='independent')
 st.altair_chart(chart, use_container_width=True)
 
 # -------------------------------
 # 최대 상승/하락 시점 표시
 # -------------------------------
-st.subheader("최대 상승/하락 시점")
+st.subheader("📌 최대 상승/하락 시점")
 
 max_row = df_plot.loc[df_plot['전년_대비_증감률'].idxmax()]
 min_row = df_plot.loc[df_plot['전년_대비_증감률'].idxmin()]
